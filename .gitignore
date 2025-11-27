@@ -1,0 +1,27 @@
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# Python virtual envs
+backend/.venv/
+backend/venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Backend storage/output (keep placeholders)
+backend/storage/*
+backend/storage/videos/
+!backend/storage/.gitkeep
+!backend/storage/subtitles/.gitkeep
+!backend/storage/prompts/.gitkeep
+!backend/storage/videos/.gitkeep
+
+# Env files
+backend/.env
+backend/env
+frontend/.env
+frontend/env
+frontend/env-*
+

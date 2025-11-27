@@ -1,0 +1,36 @@
+providers:
+  openai:
+    label: OpenAI
+    base_url: https://api.openai.com/v1
+    default_model: gpt-4o-mini
+    api_key: ${OPENAI_API_KEY}
+  deepseek:
+    label: DeepSeek
+    base_url: https://api.deepseek.com
+    default_model: deepseek-chat
+    api_key: ${DEEPSEEK_API_KEY}
+  doubao:
+    label: Doubao (Volcengine Ark)
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    default_model: doubao-pro-32k
+    api_key: ${DOUBAO_API_KEY}
+  zhipu:
+    label: Zhipu GLM
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    default_model: glm-4
+    api_key: ${ZHIPU_API_KEY}
+  spark:
+    label: iFlytek Spark
+    base_url: https://spark-api.xf-yun.com/v1
+    default_model: spark-4.0-ultra
+    api_key: ${SPARK_API_KEY}
+  grok:
+    label: xAI Grok
+    base_url: https://api.x.ai/v1
+    default_model: grok-1.5
+    api_key: ${GROK_API_KEY}
+  gemini:
+    label: Google Gemini
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    default_model: gemini-1.5-pro
+    api_key: ${GEMINI_API_KEY}
