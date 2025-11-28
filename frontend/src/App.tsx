@@ -26,6 +26,7 @@ import {
   Sparkles,
   Sun,
   UserRound,
+  X,
 } from "lucide-react";
 import type {
   SubtitleAnalysisRequest,
@@ -768,6 +769,17 @@ function App() {
                 }
                 required
               />
+                {form.videoUrl.trim() && (
+                  <button
+                    type="button"
+                    className="btn icon-btn ghost subtle"
+                    onClick={() => setForm((prev) => ({ ...prev, videoUrl: "" }))}
+                    aria-label={tr("清除链接", "Clear URL")}
+                    title={tr("清除", "Clear")}
+                  >
+                    <X size={16} strokeWidth={2} />
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn icon-btn ghost subtle"
@@ -779,7 +791,7 @@ function App() {
                   {subsStatus.type === "loading" ? (
                     <span className="spinner" aria-hidden="true" />
                   ) : (
-                    <ListChecks size={18} strokeWidth={2} />
+                    <ListChecks size={16} strokeWidth={2} />
                   )}
                   <span className="sr-only">
                     {tr("列出字幕", "List available subtitles")}
@@ -1191,15 +1203,28 @@ function App() {
         </div>
 
         <form className="chat-composer" onSubmit={handleSendMessage}>
-          <textarea
-            rows={3}
-            placeholder={tr(
-              "发送需求或问题，如：请总结这段文本 / 列出行动项",
-              "Type your request, e.g. “Summarize this text / list action items”.",
+          <div className="textarea-wrapper">
+            <textarea
+              rows={3}
+              placeholder={tr(
+                "发送需求或问题，如：请总结这段文本 / 列出行动项",
+                "Type your request, e.g. \"Summarize this text / list action items\".",
+              )}
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+            />
+            {chatInput.trim() && (
+              <button
+                type="button"
+                className="clear-input-btn"
+                onClick={() => setChatInput("")}
+                aria-label={tr("清除输入", "Clear input")}
+                title={tr("清除", "Clear")}
+              >
+                <X size={16} strokeWidth={2} />
+              </button>
             )}
-            value={chatInput}
-            onChange={(event) => setChatInput(event.target.value)}
-          />
+          </div>
           <div className="composer-footer">
             <span className="small-muted">
               {tr("Shift + Enter 换行", "Shift + Enter for new line")}
@@ -1317,10 +1342,10 @@ function App() {
               />
             </label>
             </div>
-                </div>
               </div>
-            )}
-    </div>
+                </div>
+              )}
+            </div>
   );
 }
 
@@ -1350,9 +1375,9 @@ function SubtitleSection({ title, tracks, onPick, emptyLabel }: SubtitleSectionP
           >
             <span>{track.language}</span>
             <small>{track.formats.join(", ") || emptyLabel}</small>
-          </button>
+                  </button>
         ))}
-      </div>
+                </div>
     </div>
   );
 }

@@ -1,7 +1,12 @@
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8866";
+// 在开发模式下，使用相对路径（通过Vite代理）
+// 在生产模式下，使用完整的API_BASE_URL
+const isDev = import.meta.env.DEV;
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
-const normalizedBase = API_BASE_URL.replace(/\/$/, "");
+// 开发模式下使用相对路径，生产模式下使用配置的URL或默认值
+const normalizedBase = isDev
+  ? "" // 开发模式：使用相对路径，Vite会代理到后端
+  : (apiBaseUrl || "http://localhost:8866").replace(/\/$/, "");
 
 export class ApiError extends Error {
   status?: number;
@@ -17,9 +22,15 @@ const ensureLeadingSlash = (path: string) =>
   path.startsWith("/") ? path : `/${path}`;
 
 export const buildApiUrl = (path: string) => {
+  // 如果已经是完整URL，直接返回
   if (/^https?:\/\//i.test(path)) {
     return path;
   }
+  // 开发模式：使用相对路径
+  if (isDev) {
+    return ensureLeadingSlash(path);
+  }
+  // 生产模式：使用完整URL
   return `${normalizedBase}${ensureLeadingSlash(path)}`;
 };
 

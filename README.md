@@ -37,7 +37,13 @@ copy env.example .env
 npm run dev
 ```
 
-开发阶段 Vite 已代理 `/api` 与 `/storage`，直接访问 `http://localhost:5173` 即可。
+开发阶段 Vite 已代理 `/api` 与 `/storage` 到后端（`http://localhost:8866`），直接访问 `http://localhost:5173` 即可。
+
+**端口说明**：
+- 后端默认端口：`8866`
+- 前端开发服务器端口：`5173`
+- 开发模式下，前端通过 Vite 代理访问后端，无需配置 `VITE_API_BASE_URL`
+- 生产模式下，需要配置 `VITE_API_BASE_URL` 指向实际的后端地址
 
 ## 环境配置
 
@@ -45,8 +51,8 @@ npm run dev
 | --- | --- |
 | `YT_DLP_BINARY` | 自定义 yt-dlp 路径（可选） |
 | `OPENAI_*`, `DEEPSEEK_API_KEY`, `DOUBAO_API_KEY`, `ZHIPU_API_KEY`, `SPARK_API_KEY`, `GROK_API_KEY`, `GEMINI_API_KEY` | LLM Provider 认证信息 |
-| `VITE_API_BASE_URL` | 前端调用的后端地址 |
-| `VITE_*_API_KEY` | 仅用于开发阶段自动填充的前端 Key |
+| `VITE_API_BASE_URL` | 生产模式下前端调用的后端地址（开发模式无需配置，使用 Vite 代理） |
+| `VITE_*_API_KEY` | 仅用于开发阶段自动填充的前端 Key（可选） |
 
 更多 Provider 可在 `backend/providers.yaml` 与 `frontend/src/data/providers.ts` 中扩展。
 

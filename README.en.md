@@ -37,7 +37,13 @@ copy env.example .env
 npm run dev
 ```
 
-During development, Vite proxies `/api` and `/storage`, so you can directly access `http://localhost:5173`.
+During development, Vite proxies `/api` and `/storage` to the backend (`http://localhost:8866`), so you can directly access `http://localhost:5173`.
+
+**Port Configuration**:
+- Backend default port: `8866`
+- Frontend dev server port: `5173`
+- In development mode, the frontend accesses the backend through Vite proxy, no need to configure `VITE_API_BASE_URL`
+- In production mode, you need to configure `VITE_API_BASE_URL` to point to the actual backend address
 
 ## Environment Configuration
 
@@ -45,8 +51,8 @@ During development, Vite proxies `/api` and `/storage`, so you can directly acce
 | --- | --- |
 | `YT_DLP_BINARY` | Custom yt-dlp path (optional) |
 | `OPENAI_*`, `DEEPSEEK_API_KEY`, `DOUBAO_API_KEY`, `ZHIPU_API_KEY`, `SPARK_API_KEY`, `GROK_API_KEY`, `GEMINI_API_KEY` | LLM Provider authentication |
-| `VITE_API_BASE_URL` | Backend URL for frontend calls |
-| `VITE_*_API_KEY` | Frontend keys for auto-filling during development only |
+| `VITE_API_BASE_URL` | Backend URL for frontend calls in production mode (not needed in development mode, uses Vite proxy) |
+| `VITE_*_API_KEY` | Frontend keys for auto-filling during development only (optional) |
 
 More providers can be extended in `backend/providers.yaml` and `frontend/src/data/providers.ts`.
 
