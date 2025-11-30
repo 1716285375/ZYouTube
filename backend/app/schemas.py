@@ -55,6 +55,34 @@ class SubtitleDownloadResponse(BaseModel):
     subtitle_file: str
     prompt_file: str | None = None
     prompt_preview: str | None = None
+    video_url: str | None = None
+    video_title: str | None = None
+
+
+class SubtitlePlaylistDownloadResponse(BaseModel):
+    """播放列表下载响应，包含所有视频的字幕下载结果。"""
+    job_id: UUID = Field(default_factory=uuid4)
+    total_videos: int
+    successful: int
+    failed: int
+    completed: int = 0
+    in_progress: int = 0
+    results: list[SubtitleDownloadResponse] = Field(default_factory=list)
+    status: Literal["pending", "running", "completed", "failed"] = "pending"
+    message: str | None = None
+
+
+class SubtitlePlaylistProgressResponse(BaseModel):
+    """播放列表下载进度响应。"""
+    job_id: UUID
+    total_videos: int
+    completed: int
+    successful: int
+    failed: int
+    in_progress: int
+    status: Literal["pending", "running", "completed", "failed"]
+    current_videos: list[str] = Field(default_factory=list, description="当前正在下载的视频URL")
+    results: list[SubtitleDownloadResponse] = Field(default_factory=list)
 
 
 class SubtitleTrack(BaseModel):
@@ -141,4 +169,5 @@ class VideoJobResponse(BaseModel):
     fetch_url: str | None = None
     created_at: datetime
     updated_at: datetime
+
 

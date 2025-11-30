@@ -1,4 +1,6 @@
-from fastapi import APIRouter
+from uuid import UUID
+
+from fastapi import APIRouter, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
 from starlette.concurrency import iterate_in_threadpool
 from starlette.responses import StreamingResponse
@@ -11,6 +13,8 @@ from ..schemas import (
     SubtitleDownloadResponse,
     SubtitleListRequest,
     SubtitleListResponse,
+    SubtitlePlaylistDownloadResponse,
+    SubtitlePlaylistProgressResponse,
 )
 from ..services.llm_service import LLMService
 from ..services.prompt_service import PromptService
@@ -24,9 +28,35 @@ subtitle_service = SubtitleService(settings, prompt_service)
 llm_service = LLMService(settings)
 
 
-@router.post("/download", response_model=SubtitleDownloadResponse)
-async def download_subtitles(payload: SubtitleDownloadRequest) -> SubtitleDownloadResponse:
+@router.post("/download")
+async def download_subtitles(
+    payload: SubtitleDownloadRequest
+) -> SubtitleDownloadResponse | SubtitlePlaylistDownloadResponse:
+    """下载字幕，如果是播放列表则返回播放列表响应（包含job_id用于查询进度）。"""
     return await run_in_threadpool(subtitle_service.download, payload)
+
+
+@router.get("/playlist-progress/{job_id}", response_model=SubtitlePlaylistProgressResponse)
+async def get_playlist_progress(job_id: UUID) -> SubtitlePlaylistProgressResponse:
+    """获取播放列表下载进度。"""
+    progress = await run_in_threadpool(subtitle_service.get_playlist_progress, job_id)
+    if progress is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="未找到对应的下载任务，可能已完成或不存在。",
+        )
+    
+    return SubtitlePlaylistProgressResponse(
+        job_id=job_id,
+        total_videos=progress["total_videos"],
+        completed=progress["completed"],
+        successful=progress["successful"],
+        failed=progress["failed"],
+        in_progress=progress["in_progress"],
+        status=progress["status"],
+        current_videos=progress["current_videos"],
+        results=progress["results"],
+    )
 
 
 @router.post("/list", response_model=SubtitleListResponse)

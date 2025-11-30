@@ -35,6 +35,8 @@ import type {
   SubtitleDownloadResponse,
   SubtitleFormat,
   SubtitleListResponse,
+  SubtitlePlaylistDownloadResponse,
+  SubtitlePlaylistProgressResponse,
   SubtitleTrack,
   VideoJobResponse,
   VideoQuality,
@@ -152,6 +154,14 @@ function App() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<SubtitleDownloadResponse | null>(null);
+  const [playlistProgress, setPlaylistProgress] = useState<SubtitlePlaylistProgressResponse | null>(null);
+  const [playlistPollingInterval, setPlaylistPollingInterval] = useState<ReturnType<typeof setInterval> | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return 320;
+    const stored = localStorage.getItem("ytsub_sidebar_width");
+    return stored ? parseInt(stored, 10) : 320;
+  });
+  const [isResizing, setIsResizing] = useState(false);
   const [availableSubs, setAvailableSubs] = useState<SubtitleListResponse | null>(
     null,
   );
@@ -193,6 +203,52 @@ function App() {
     (zh: string, en: string) => (locale === "zh" ? zh : en),
     [locale],
   );
+
+  // 清理播放列表轮询
+  useEffect(() => {
+    return () => {
+      if (playlistPollingInterval) {
+        clearInterval(playlistPollingInterval);
+      }
+    };
+  }, [playlistPollingInterval]);
+
+  // 保存侧边栏宽度
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ytsub_sidebar_width", sidebarWidth.toString());
+    }
+  }, [sidebarWidth]);
+
+  // 处理拖动调整侧边栏宽度
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = e.clientX - (window.innerWidth * 0.03); // 减去左侧padding
+      const minWidth = 200;
+      const maxWidth = Math.min(600, window.innerWidth * 0.6);
+      setSidebarWidth(Math.max(minWidth, Math.min(maxWidth, newWidth)));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
+
   const themeToggleTitle =
     theme === "light"
       ? tr("切换夜间模式", "Switch to dark mode")
@@ -357,6 +413,34 @@ function App() {
     }
   };
 
+  const fetchPlaylistProgress = async (jobId: string) => {
+    try {
+      const progress = await requestJson<SubtitlePlaylistProgressResponse>(
+        `/api/subtitles/playlist-progress/${jobId}`,
+      );
+      setPlaylistProgress(progress);
+      
+      // 如果已完成或失败，停止轮询
+      if (progress.status === "completed" || progress.status === "failed") {
+        if (playlistPollingInterval) {
+          clearInterval(playlistPollingInterval);
+          setPlaylistPollingInterval(null);
+        }
+        setIsSubmitting(false);
+        if (progress.status === "completed") {
+          pushToast("success", tr("播放列表字幕下载完成！", "Playlist subtitle download completed!"));
+        }
+      }
+    } catch (error) {
+      // 如果获取进度失败，可能是任务已完成或不存在
+      if (playlistPollingInterval) {
+        clearInterval(playlistPollingInterval);
+        setPlaylistPollingInterval(null);
+      }
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.videoUrl) {
@@ -384,26 +468,67 @@ function App() {
 
     setIsSubmitting(true);
     setResult(null);
+    setPlaylistProgress(null);
+
+    // 清除之前的轮询
+    if (playlistPollingInterval) {
+      clearInterval(playlistPollingInterval);
+      setPlaylistPollingInterval(null);
+    }
 
     try {
-      const data = await postJson<SubtitleDownloadResponse>(
+      const data = await postJson<SubtitleDownloadResponse | SubtitlePlaylistDownloadResponse>(
         "/api/subtitles/download",
         payload,
       );
-      setResult(data);
-      const fileUrl = toPublicAssetUrl(data.subtitle_file);
-      if (fileUrl) {
-        const fileResponse = await fetch(fileUrl);
-        if (fileResponse.ok) {
-          const text = await fileResponse.text();
-          setSubtitleRaw(text);
+      
+      // 检查是否是播放列表响应
+      if ("total_videos" in data && "job_id" in data) {
+        // 这是播放列表响应
+        const playlistData = data as SubtitlePlaylistDownloadResponse;
+        setPlaylistProgress({
+          job_id: playlistData.job_id,
+          total_videos: playlistData.total_videos,
+          completed: playlistData.completed,
+          successful: playlistData.successful,
+          failed: playlistData.failed,
+          in_progress: playlistData.in_progress,
+          status: playlistData.status,
+          current_videos: [],
+          results: playlistData.results,
+        });
+        
+        // 如果还在运行，启动轮询
+        if (playlistData.status === "running" || playlistData.status === "pending") {
+          const interval = setInterval(() => {
+            fetchPlaylistProgress(playlistData.job_id);
+          }, 2000); // 每2秒轮询一次
+          setPlaylistPollingInterval(interval);
+        } else {
+          setIsSubmitting(false);
+          if (playlistData.status === "completed") {
+            pushToast("success", tr("播放列表字幕下载完成！", "Playlist subtitle download completed!"));
+          }
+        }
+      } else {
+        // 单个视频响应
+        const singleData = data as SubtitleDownloadResponse;
+        setResult(singleData);
+        const fileUrl = toPublicAssetUrl(singleData.subtitle_file);
+        if (fileUrl) {
+          const fileResponse = await fetch(fileUrl);
+          if (fileResponse.ok) {
+            const text = await fileResponse.text();
+            setSubtitleRaw(text);
+          } else {
+            setSubtitleRaw("");
+          }
         } else {
           setSubtitleRaw("");
         }
-      } else {
-        setSubtitleRaw("");
+        setIsSubmitting(false);
+        pushToast("success", tr("字幕处理完成，可以下载啦！", "Subtitles processed. Ready to download!"));
       }
-      pushToast("success", tr("字幕处理完成，可以下载啦！", "Subtitles processed. Ready to download!"));
     } catch (error) {
       const message =
         error instanceof ApiError
@@ -412,8 +537,11 @@ function App() {
             ? error.message
             : tr("未知错误，请稍后再试", "Unknown error, please try again.");
       pushToast("error", message);
-    } finally {
       setIsSubmitting(false);
+      if (playlistPollingInterval) {
+        clearInterval(playlistPollingInterval);
+        setPlaylistPollingInterval(null);
+      }
     }
   };
 
@@ -727,7 +855,7 @@ function App() {
   return (
     <div className="page chat-shell">
       <ToastStack toasts={toasts} onDismiss={removeToast} />
-      <aside className="control-column">
+      <aside className="control-column" style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}>
         <div className="top-controls">
           <button
             type="button"
@@ -748,6 +876,20 @@ function App() {
             {languageToggleLabel}
           </button>
         </div>
+        <div
+          className="resize-handle"
+          onMouseDown={handleResizeStart}
+          style={{
+            cursor: "col-resize",
+            width: "4px",
+            backgroundColor: "transparent",
+            position: "absolute",
+            right: "-2px",
+            top: 0,
+            bottom: 0,
+            zIndex: 10,
+          }}
+        />
         <section className="panel form-panel">
           <h2>{tr("字幕抓取参数", "Subtitle Parameters")}</h2>
           <p className="subtitle compact">
@@ -925,6 +1067,109 @@ function App() {
                 : tr("生成字幕与提示词", "Generate subtitles & prompts")}
             </button>
           </form>
+
+        {playlistProgress && (
+          <div className="result-stack">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <h3 style={{ margin: 0 }}>{tr("播放列表下载进度", "Playlist Download Progress")}</h3>
+              <button
+                className="btn ghost"
+                onClick={() => {
+                  setPlaylistProgress(null);
+                  if (playlistPollingInterval) {
+                    clearInterval(playlistPollingInterval);
+                    setPlaylistPollingInterval(null);
+                  }
+                }}
+                style={{ fontSize: "0.85rem", padding: "6px 12px" }}
+              >
+                {tr("清除", "Clear")}
+              </button>
+            </div>
+            <div className="result-card">
+              <div style={{ width: "100%" }}>
+                <div className="progress-header">
+                  <span className="progress-label">
+                    {playlistProgress.completed} / {playlistProgress.total_videos}
+                  </span>
+                  <div className="progress-track">
+                    <div
+                      className="progress-thumb"
+                      style={{
+                        width: `${(playlistProgress.completed / playlistProgress.total_videos) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+                <div style={{ marginTop: "12px", display: "flex", gap: "16px", flexWrap: "wrap" }}>
+                  <span className="small-muted">
+                    {tr("成功：", "Successful:")} {playlistProgress.successful}
+                  </span>
+                  <span className="small-muted">
+                    {tr("失败：", "Failed:")} {playlistProgress.failed}
+                  </span>
+                  <span className="small-muted">
+                    {tr("进行中：", "In Progress:")} {playlistProgress.in_progress}
+                  </span>
+                </div>
+                {playlistProgress.current_videos.length > 0 && (
+                  <div style={{ marginTop: "12px" }}>
+                    <p className="small-muted">
+                      {tr("当前下载：", "Currently downloading:")}
+                    </p>
+                    <ul style={{ marginTop: "8px", paddingLeft: "20px" }}>
+                      {playlistProgress.current_videos.map((url, idx) => (
+                        <li key={idx} className="small-muted" style={{ wordBreak: "break-all" }}>
+                          {url}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {playlistProgress.status === "completed" && playlistProgress.results.length > 0 && (
+                  <div style={{ marginTop: "16px" }}>
+                    <p className="label">{tr("下载结果", "Download Results")}</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px" }}>
+                      {playlistProgress.results.map((item, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: "8px",
+                            background: item.subtitle_file
+                              ? "rgba(34, 197, 94, 0.1)"
+                              : "rgba(239, 68, 68, 0.1)",
+                            border: `1px solid ${item.subtitle_file ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span className="small-muted" style={{ flex: 1, wordBreak: "break-all" }}>
+                              {item.video_title || item.video_url || `Video ${idx + 1}`}
+                            </span>
+                            {item.subtitle_file ? (
+                              <a
+                                href={toPublicAssetUrl(item.subtitle_file) ?? undefined}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ marginLeft: "12px", color: "var(--brand)" }}
+                              >
+                                {tr("下载", "Download")}
+                              </a>
+                            ) : (
+                              <span className="small-muted" style={{ marginLeft: "12px" }}>
+                                {item.prompt_preview || tr("失败", "Failed")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {result && (
             <div className="result-stack">

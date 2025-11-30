@@ -34,6 +34,32 @@ export interface SubtitleDownloadResponse {
   subtitle_file: string;
   prompt_file?: string | null;
   prompt_preview?: string | null;
+  video_url?: string | null;
+  video_title?: string | null;
+}
+
+export interface SubtitlePlaylistDownloadResponse {
+  job_id: string;
+  total_videos: number;
+  successful: number;
+  failed: number;
+  completed: number;
+  in_progress: number;
+  results: SubtitleDownloadResponse[];
+  status: "pending" | "running" | "completed" | "failed";
+  message?: string | null;
+}
+
+export interface SubtitlePlaylistProgressResponse {
+  job_id: string;
+  total_videos: number;
+  completed: number;
+  successful: number;
+  failed: number;
+  in_progress: number;
+  status: "pending" | "running" | "completed" | "failed";
+  current_videos: string[];
+  results: SubtitleDownloadResponse[];
 }
 
 export interface SubtitleTrack {
